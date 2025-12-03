@@ -1,0 +1,73 @@
+// app/api/ai/workout-plan/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { askAI } from "@/lib/aiService";
+import { prompts } from "@/lib/aiPrompts";
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    // Validate required fields
+    const requiredFields = ['level', 'duration', 'fitnessGoal'];
+    for (const field of requiredFields) {
+      if (!(field in body)) {
+        return NextResponse.json(
+          { error: `Missing required field: ${field}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Create user object from request body
+    const user = {
+      level: body.level,
+      duration: body.duration,
+      fitnessGoal: body.fitnessGoal,
+      equipment: body.equipment || [],
+      recentActivity: body.recentActivity || 'regular activity',
+      age: body.age || null,
+      name: body.name || 'User'
+    };
+
+    // Generate the prompt using our template
+    const prompt = prompts.workoutPlan(user);
+
+    // Call the AI service
+    const response = await askAI(prompt);
+
+    // Try to parse the AI response as JSON
+    let parsedResponse;
+    try {
+      // Extract JSON from the response if it's wrapped in markdown or other text
+      const jsonMatch = response.reply.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedResponse = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No valid JSON found in AI response");
+      }
+    } catch (parseError) {
+      console.error("Error parsing AI response:", parseError);
+      console.log("Raw AI response:", response.reply);
+      
+      // Return a generic error response
+      return NextResponse.json(
+        { 
+          error: "Failed to parse workout plan from AI response",
+          rawResponse: response.reply
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(parsedResponse);
+  } catch (error) {
+    console.error("Error in workout plan API:", error);
+    return NextResponse.json(
+      { 
+        error: "Failed to generate workout plan",
+        detail: error instanceof Error ? error.message : "Unknown error"
+      },
+      { status: 500 }
+    );
+  }
+}
