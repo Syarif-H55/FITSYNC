@@ -52,7 +52,10 @@ const TrendVisualizer = ({ userId }: TrendVisualizerProps) => {
       let actualUserId = userId;
       if (!actualUserId) {
         if (session && session.user) {
-          actualUserId = session.user.email || session.user.name || 'default_user';
+          // Use the same userId format as data entry pages (activities, meals, sleep)
+          // Prioritize session.username to match how data is stored
+          const userWithUsername = session.user as any;
+          actualUserId = userWithUsername.username || session.user.email || session.user.name || 'default_user';
         } else {
           const fallbackSession = getSession();
           actualUserId = fallbackSession?.username || 'default_user';

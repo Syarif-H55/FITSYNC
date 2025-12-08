@@ -24,7 +24,9 @@ export const useWeeklyReport = (): WeeklyReportHook => {
 
       let userId = 'default_user';
       if (session && session.user) {
-        userId = session.user.email || session.user.name || 'default_user';
+        // Use the consistent userId helper to ensure we use the same format as data storage
+        const { getConsistentUserId } = await import('@/lib/userId-helper');
+        userId = getConsistentUserId(session);
       } else {
         const fallbackSession = getSession();
         userId = fallbackSession?.username || 'default_user';

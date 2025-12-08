@@ -209,10 +209,12 @@ export default function WeeklyInsightsPage() {
     try {
       // Get current user session and stats from unified aggregator
       // Safe access to session properties with fallback
+      // Use the same userId format as data entry pages (activities, meals, sleep)
+      // Prioritize session.username to match how data is stored
       const userWithUsername = session?.user as any || {};
-      const userId = userWithUsername.email ||
+      const userId = userWithUsername.username ||
+                    userWithUsername.email ||
                     userWithUsername.name ||
-                    userWithUsername.username ||
                     'default_user';
       console.log('Generating AI insights for user:', userId);
       const stats = getSummaryStats ?

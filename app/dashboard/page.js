@@ -41,7 +41,16 @@ export default function DashboardPage() {
   })
 
   // Load trend data using the new hook
-  const userId = session?.user?.email || session?.user?.name || 'default_user';
+  // Use consistent userId format to match how data is stored (prioritize session.username)
+  let userId = 'default_user';
+  if (session && session.user) {
+    // Check if session has username property (from localStorage sync) - matches how data is stored
+    const userWithUsername = session.user;
+    userId = userWithUsername.username || session.user.email || session.user.name || 'default_user';
+  } else {
+    const fallbackSession = getSession();
+    userId = fallbackSession?.username || 'default_user';
+  }
   const { trendData, loading: trendLoading, error: trendError, reload: reloadTrendData } = useTrendData({ userId });
   const [activities, setActivities] = useState([]);
   const [aiInsight, setAiInsight] = useState('');

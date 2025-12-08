@@ -38,7 +38,9 @@ const SleepTrendChart: React.FC<SleepTrendChartProps> = ({
         let actualUserId = userId;
         if (!actualUserId) {
           if (session && session.user) {
-            actualUserId = session.user.email || session.user.name || 'default_user';
+            // Use the consistent userId helper to ensure we use the same format as data storage
+            const { getConsistentUserId } = await import('@/lib/userId-helper');
+            actualUserId = getConsistentUserId(session);
           } else {
             const fallbackSession = getSession();
             actualUserId = fallbackSession?.username || 'default_user';

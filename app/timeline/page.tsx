@@ -44,7 +44,10 @@ export default function TimelinePage() {
 
       let userId = 'default_user';
       if (session && session.user) {
-        userId = session.user.email || session.user.name || 'default_user';
+        // Use the same userId format as data entry pages (activities, meals, sleep)
+        // Prioritize session.username to match how data is stored
+        const userWithUsername = session.user as any;
+        userId = userWithUsername.username || session.user.email || session.user.name || 'default_user';
       } else {
         const fallbackSession = getSession();
         userId = fallbackSession?.username || 'default_user';

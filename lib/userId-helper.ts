@@ -45,3 +45,34 @@ export function getUserIdFromSession(nextAuthSession?: any): string {
   return getConsistentUserId(nextAuthSession);
 }
 
+/**
+ * Async version of getConsistentUserId that properly handles dynamic imports
+ * This function can be safely called with await import() to ensure the getSession helper is available
+ */
+export async function getConsistentUserIdAsync(session?: any): Promise<string> {
+  // Try NextAuth session first
+  if (session?.user) {
+    // Check if session has username property (from localStorage sync)
+    if (session.user.username) {
+      return session.user.username;
+    }
+    // Fallback to email or name
+    return session.user.email || session.user.name || 'default_user';
+  }
+
+  // Try localStorage session
+  try {
+    // Dynamically import the getSession function to avoid circular dependencies
+    const { getSession } = await import('./session');
+    const localStorageSession = getSession();
+    if (localStorageSession?.username) {
+      return localStorageSession.username;
+    }
+  } catch (e) {
+    console.warn('[getConsistentUserIdAsync] Error getting localStorage session:', e);
+  }
+
+  // Ultimate fallback
+  return 'default_user';
+}
+
