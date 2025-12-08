@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useXp } from '@/context/XpContext';
 import { getSession } from '@/lib/session';
-import UnifiedAggregator from '@/lib/storage/unified-aggregator-wrapper';
+import UnifiedAggregator, { getWeeklyStats, getDailyStats, getInsightsData, getSummaryStats } from '@/lib/storage/unified-aggregator-wrapper';
 // Import new components
 import InsightCard from '@/components/insights/InsightCard';
 import MetricCard from '@/components/insights/MetricCard';
@@ -43,45 +43,41 @@ export default function WeeklyInsightsPage() {
   // Ref for the timeout ID
   const debouncedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchInsightsData = async () => {
+  const fetchInsightsData = useCallback(async () => {
     setIsLoading(true);
     console.log('[INSIGHTS] fetchInsightsData - start');
     try {
       // Use unified aggregator instead of legacy insights function
       // Get consistent userId - prioritize session.username to match data storage
       let sessionUserId;
-      if (session && session.user) {
-        // Try to match the format used when saving data (session.username)
-        // session.user might have username property if synced from localStorage
-        const userWithUsername = session.user as any;
-        sessionUserId = userWithUsername.username || session.user.email || session.user.name || 'default_user';
-      } else {
-        // Fallback - only if absolutely needed
+      // Safe access to session properties with proper fallbacks
+      const userWithUsername = session?.user as any || {};
+      sessionUserId = userWithUsername.username ||
+                     userWithUsername.email ||
+                     userWithUsername.name ||
+                     'default_user';
+
+      // Only try async fallback if session is not available and we need a valid user
+      if (sessionUserId === 'default_user') {
         try {
-          // Only try async fallback if session is not available
-          const { getSession: asyncGetSession } = await import('@/lib/session');
-          const fallbackSession = await asyncGetSession();
+          // Using statically imported getSession function
+          const fallbackSession = await getSession();
           sessionUserId = fallbackSession?.username || 'default_user';
         } catch (e) {
-          sessionUserId = 'default_user';
           console.warn('[INSIGHTS] Could not get user ID, using default');
         }
       }
 
       const userId = sessionUserId;
       console.log('[INSIGHTS] Fetching insights data for user:', userId);
-      console.log('[INSIGHTS] Session data:', { 
-        hasSession: !!session, 
+      console.log('[INSIGHTS] Session data:', {
+        hasSession: !!session,
         username: (session?.user as any)?.username,
         email: session?.user?.email,
-        name: session?.user?.name 
+        name: session?.user?.name
       });
 
-      // Verify correct import of unified aggregator
-      // Use named exports for direct access
-      const { getWeeklyStats, getDailyStats, getInsightsData } = await import('@/lib/storage/unified-aggregator-wrapper');
-
-      // Fetch data using unified aggregator
+      // Fetch data using unified aggregator with static imports
       let weeklyStats = null;
       try {
         if (getWeeklyStats) {
@@ -99,7 +95,7 @@ export default function WeeklyInsightsPage() {
         console.error('[INSIGHTS] Weekly stats error stack:', e.stack);
       }
 
-      // Also get insights data using the named export if available
+      // Also get insights data using the named export
       let data;
       try {
         if (getInsightsData) {
@@ -143,7 +139,7 @@ export default function WeeklyInsightsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session]); // Add session as dependency to stabilize the function
 
   // Debounced fetchInsightsData function to prevent rapid multiple calls
   const debouncedFetchInsightsData = useCallback(() => {
@@ -212,37 +208,38 @@ export default function WeeklyInsightsPage() {
     setIsGeneratingInsight(true);
     try {
       // Get current user session and stats from unified aggregator
-      if (session && session.user) {
-        const userId = session.user.email || session.user.name || 'default_user';
-        console.log('Generating AI insights for user:', userId);
-        const unifiedModule = await import('@/lib/storage/unified-aggregator-wrapper');
-        const getSummaryStats = unifiedModule.getSummaryStats;
-        const stats = getSummaryStats ?
-          await getSummaryStats(userId) :
-          await UnifiedAggregator.getSummaryStats(userId);
-        console.log('Generated summary stats:', stats);
+      // Safe access to session properties with fallback
+      const userWithUsername = session?.user as any || {};
+      const userId = userWithUsername.email ||
+                    userWithUsername.name ||
+                    userWithUsername.username ||
+                    'default_user';
+      console.log('Generating AI insights for user:', userId);
+      const stats = getSummaryStats ?
+        await getSummaryStats(userId) :
+        await UnifiedAggregator.getSummaryStats(userId);
+      console.log('Generated summary stats:', stats);
 
-        // Send request to API with user data
-        const response = await fetch('/api/insights', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            period: 'week',
-            userData: {
-              session: session,
-              stats: stats
-            }
-          }),
-        });
+      // Send request to API with user data
+      const response = await fetch('/api/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          period: 'week',
+          userData: {
+            session: session,
+            stats: stats
+          }
+        }),
+      });
 
-        if (!response.ok) {
-          throw new Error('Failed to generate AI insights');
-        }
-
-        const data = await response.json();
-        console.log('Received AI insights:', data);
-        setAiInsights(data);
+      if (!response.ok) {
+        throw new Error('Failed to generate AI insights');
       }
+
+      const data = await response.json();
+      console.log('Received AI insights:', data);
+      setAiInsights(data);
     } catch (error) {
       console.error('Error generating AI insights:', error);
       // Set fallback insights

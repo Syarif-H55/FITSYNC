@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 // Array of motivational messages
 const motivationalMessages = [
   "🔥 You're 2000 steps away from your daily goal — keep going!",
